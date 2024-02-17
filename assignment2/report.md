@@ -3,6 +3,8 @@
 **Aaron Nguyen**  
 PID: 6403474
 
+![Screenshot](./screenshot.png)
+
 ## Design Choices
 
 - **Separate functions**: Utilizing distinct functions for FCFS and SJF enhances code organization, readability, and maintainability, enabling focused implementation and debugging.

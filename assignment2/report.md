@@ -7,19 +7,19 @@ PID: 6403474
 
 ## Design Choices
 
-- **Separate functions**: Utilizing distinct functions for FCFS and SJF enhances code organization, readability, and maintainability, enabling focused implementation and debugging.
+- **Separate functions**: Using distinct functions for FCFS and SJF improves code organization, readability, and maintainability, allowing focused implementation and debugging.
 
-- **Queueing principle for FCFS**: FCFS adheres to a queueing principle, executing processes in arrival order. Utilizing a prefix sum algorithm efficiently calculates waiting and turnaround times.
+- **Queueing principle for FCFS**: FCFS follows a basic queueing principle, executing processes in the order of arrival. It efficiently calculates waiting and turnaround times using a prefix sum algorithm.
 
 - **Greedy approach for SJF**: SJF employs a greedy strategy, selecting the process with the shortest burst time at each decision point to minimize the time for the next shortest job to execute.
 
-- **In-place swapping for SJF**: In SJF, in-place swapping dynamically reorders processes based on burst times, optimizing memory usage and computational efficiency while ensuring process identification consistency.
+- **In-place swapping for SJF**: In SJF, in-place swapping dynamically reorders processes based on burst times, optimizing memory usage and computational efficiency while ensuring consistent process identification.
 
 ## Challenges Encountered
 
-- **Accurate time calculation**: Precision in calculating waiting and turnaround times, especially for SJF, poses challenges due to dynamic process selection, requiring meticulous tracking of `current_time` and adjustments based on process arrival times.
+- **Accurate time calculation**: Precision in calculating waiting and turnaround times, especially for SJF, is challenging due to dynamic process selection. It requires meticulous tracking of `current_time` and adjustments based on process arrival times.
 
-- **Maintaining execution order for SJF**: Preserving execution order while selecting processes based on burst time presents challenges, necessitating careful selection of the index to swap within arrays.
+- **Maintaining execution order for SJF**: Preserving the execution order while selecting processes based on burst time presents challenges, requiring careful selection of the index to swap within arrays.
 
 ## Addressing Challenges
 
@@ -29,10 +29,10 @@ PID: 6403474
 
 ## Lessons Learned
 
-- **Modular design**: Separate functions streamline implementation and debugging, enhancing code organization and maintainability.
+- **Modular design**: Using separate functions streamlines implementation and debugging, improving code organization and maintainability.
 
 - **Precision in time calculation**: Achieving accuracy in time calculations demands meticulous tracking of variables and adjustments based on process characteristics, particularly in dynamic scheduling algorithms like SJF.
 
-- **Efficient data manipulation**: In-place swapping optimizes memory usage and computational efficiency in SJF, underscoring the importance of efficient data manipulation techniques.
+- **Efficient data manipulation**: In-place swapping optimizes memory usage and computational efficiency in SJF, highlighting the importance of efficient data manipulation techniques.
 
 - **Manual verification of results**: Testing and manually verifying results provide essential validation, ensuring the correctness and reliability of simulation outcomes.

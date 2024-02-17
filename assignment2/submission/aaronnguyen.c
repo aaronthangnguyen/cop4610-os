@@ -44,10 +44,9 @@ void fcfs(int num_process, int *arrival, int *burst)
         if (i < num_process - 1)
             printf(" -> ");
     }
-    printf("\n");
 
     // Display average waiting and turnaround times
-    printf("Average Waiting Time: %.2f\n", (float)total_waiting / num_process);
+    printf("\nAverage Waiting Time: %.2f\n", (float)total_waiting / num_process);
     printf("Average Turnaround Time: %.2f\n", (float)total_turnaround / num_process);
 }
 

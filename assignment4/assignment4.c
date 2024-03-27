@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdio.h>
@@ -7,61 +8,95 @@
 sem_t access_mutex;
 sem_t readers_mutex;
 sem_t order_mutex;
+
 int shared_counter = 0;
 unsigned int readers = 0;
 
-void *reader(void *args) {
-  long id = (long)args;
-  sem_wait(&order_mutex);
-  sem_wait(&readers_mutex);
+// Error checking semaphore operations
+#define HANDLE_SEM_ERROR(en, msg)                                              \
+  do {                                                                         \
+    errno = en;                                                                \
+    perror(msg);                                                               \
+    exit(EXIT_FAILURE);                                                        \
+  } while (0)
+
+void initialize_semaphores() {
+  if (sem_init(&access_mutex, 0, 1) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_init access_mutex");
+  if (sem_init(&readers_mutex, 0, 1) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_init readers_mutex");
+  if (sem_init(&order_mutex, 0, 1) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_init order_mutex");
+}
+
+void *reader(void *arg) {
+  long id = (long)arg;
+
+  if (sem_wait(&order_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_wait order_mutex");
+  if (sem_wait(&readers_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_wait readers_mutex");
   if (readers == 0)
-    sem_wait(&access_mutex);
+    if (sem_wait(&access_mutex) != 0)
+      HANDLE_SEM_ERROR(errno, "sem_wait access_mutex");
   readers++;
-  sem_post(&order_mutex);
-  sem_post(&readers_mutex);
+  if (sem_post(&order_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_post order_mutex");
+  if (sem_post(&readers_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_post readers_mutex");
 
-  // Simulate reading the shared_counter 2,000,000 times
-  int local_copy = shared_counter;
+  // Simulating reading
+  int local_copy;
+  for (int i = 0; i < 2000000; ++i) {
+    local_copy = shared_counter;
+  }
+  printf("Reader %ld reads shared counter value: %d\n", id, local_copy);
 
-  sem_wait(&readers_mutex);
+  if (sem_wait(&readers_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_wait readers_mutex");
   readers--;
   if (readers == 0)
-    sem_post(&access_mutex);
-  sem_post(&readers_mutex);
+    if (sem_post(&access_mutex) != 0)
+      HANDLE_SEM_ERROR(errno, "sem_post access_mutex");
+  if (sem_post(&readers_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_post readers_mutex");
 
-  printf("Reader %ld read the value: %d\n", id, local_copy);
   return NULL;
 }
 
-void *writer(void *args) {
-  sem_wait(&order_mutex);
-  sem_wait(&access_mutex);
-  sem_post(&order_mutex);
+void *writer(void *arg) {
+  if (sem_wait(&order_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_wait order_mutex");
+  if (sem_wait(&access_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_wait access_mutex");
+  if (sem_post(&order_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_post order_mutex");
 
+  // Simulating writing
   for (int i = 0; i < 25000; ++i) {
     shared_counter++;
   }
   printf("Writer done, final value: %d\n", shared_counter);
 
-  sem_post(&access_mutex);
+  if (sem_post(&access_mutex) != 0)
+    HANDLE_SEM_ERROR(errno, "sem_post access_mutex");
+
   return NULL;
 }
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     fprintf(stderr, "Usage: %s <number of readers>\n", argv[0]);
-    return EXIT_FAILURE;
+    exit(EXIT_FAILURE);
   }
 
   int num_readers = atoi(argv[1]);
-  if (num_readers < 1 || num_readers > 12) {
+  if (num_readers <= 0 || num_readers > 12) {
     fprintf(stderr, "Number of readers must be between 1 and 12.\n");
-    return EXIT_FAILURE;
+    exit(EXIT_FAILURE);
   }
 
-  sem_init(&access_mutex, 0, 1);
-  sem_init(&readers_mutex, 0, 1);
-  sem_init(&order_mutex, 0, 1);
+  initialize_semaphores();
 
   pthread_t writer_thread;
   pthread_t reader_threads[num_readers];
@@ -80,5 +115,5 @@ int main(int argc, char *argv[]) {
   sem_destroy(&readers_mutex);
   sem_destroy(&order_mutex);
 
-  return EXIT_SUCCESS;
+  return 0;
 }

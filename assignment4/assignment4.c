@@ -5,25 +5,19 @@
 #include <unistd.h>
 
 // Semaphores to control read/write access
-sem_t access_mutex;  // Controls access to the shared resource, ensuring
-                     // exclusive access for writers.
-sem_t readers_mutex; // Protects the 'readers' count to prevent race conditions
-                     // when updating.
-sem_t order_mutex;   // Ensures that access requests are processed in the order
-                     // they arrive, maintaining fairness.
+sem_t access_mutex;  // Controls access to the shared resource.
+sem_t readers_mutex; // Protects the 'readers' count.
+sem_t order_mutex;   // Ensures that access by order of arrival.
 
-int shared_counter =
-    0; // The shared resource that readers read and writers write.
-unsigned int readers = 0; // Count of currently active readers.
+int shared_counter = 0;   // Shared resource
+unsigned int readers = 0; // Count of active readers.
 
 // Function to initialize semaphores
 void initialize_semaphores() {
-  sem_init(
-      &access_mutex, 0,
-      1); // Initialized to 1, allowing immediate write access if no readers.
-  sem_init(&readers_mutex, 0, 1); // Protects updates to the 'readers' count.
-  sem_init(&order_mutex, 0, 1); // Maintains request order, initialized to 1 to
-                                // allow the first thread immediate access.
+  sem_init(&access_mutex, 0,
+           1); // Initialized to 1, allowing write access if no readers.
+  sem_init(&readers_mutex, 0, 1);
+  sem_init(&order_mutex, 0, 1);
 }
 
 // Reader thread function
@@ -106,4 +100,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-

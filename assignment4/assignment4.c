@@ -1,86 +1,75 @@
-#include <errno.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-sem_t access_mutex;
-sem_t readers_mutex;
-sem_t order_mutex;
+// Semaphores to control read/write access
+sem_t access_mutex;  // Controls access to the shared resource, ensuring
+                     // exclusive access for writers.
+sem_t readers_mutex; // Protects the 'readers' count to prevent race conditions
+                     // when updating.
+sem_t order_mutex;   // Ensures that access requests are processed in the order
+                     // they arrive, maintaining fairness.
 
-int shared_counter = 0;
-unsigned int readers = 0;
+int shared_counter =
+    0; // The shared resource that readers read and writers write.
+unsigned int readers = 0; // Count of currently active readers.
 
-// Error checking semaphore operations
-#define HANDLE_SEM_ERROR(en, msg)                                              \
-  do {                                                                         \
-    errno = en;                                                                \
-    perror(msg);                                                               \
-    exit(EXIT_FAILURE);                                                        \
-  } while (0)
-
+// Function to initialize semaphores
 void initialize_semaphores() {
-  if (sem_init(&access_mutex, 0, 1) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_init access_mutex");
-  if (sem_init(&readers_mutex, 0, 1) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_init readers_mutex");
-  if (sem_init(&order_mutex, 0, 1) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_init order_mutex");
+  sem_init(
+      &access_mutex, 0,
+      1); // Initialized to 1, allowing immediate write access if no readers.
+  sem_init(&readers_mutex, 0, 1); // Protects updates to the 'readers' count.
+  sem_init(&order_mutex, 0, 1); // Maintains request order, initialized to 1 to
+                                // allow the first thread immediate access.
 }
 
+// Reader thread function
 void *reader(void *arg) {
   long id = (long)arg;
 
-  if (sem_wait(&order_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_wait order_mutex");
-  if (sem_wait(&readers_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_wait readers_mutex");
+  // Ensure order of access to prevent starvation and ensure fairness.
+  sem_wait(&order_mutex);
+  // Protect 'readers' count update
+  sem_wait(&readers_mutex);
   if (readers == 0)
-    if (sem_wait(&access_mutex) != 0)
-      HANDLE_SEM_ERROR(errno, "sem_wait access_mutex");
+    sem_wait(&access_mutex); // If first reader, lock resource from writers.
   readers++;
-  if (sem_post(&order_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_post order_mutex");
-  if (sem_post(&readers_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_post readers_mutex");
+  // Release semaphores after successfully updating 'readers' count
+  sem_post(&order_mutex);
+  sem_post(&readers_mutex);
 
-  // Simulating reading
-  int local_copy;
-  for (int i = 0; i < 2000000; ++i) {
-    local_copy = shared_counter;
-  }
-  printf("Reader %ld reads shared counter value: %d\n", id, local_copy);
+  // Simulated reading operation
+  int local_copy = shared_counter; // Copy shared counter value (simulated read)
 
-  if (sem_wait(&readers_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_wait readers_mutex");
+  // On finishing reading, check if this reader is the last to ensure writers
+  // can proceed.
+  sem_wait(&readers_mutex);
   readers--;
   if (readers == 0)
-    if (sem_post(&access_mutex) != 0)
-      HANDLE_SEM_ERROR(errno, "sem_post access_mutex");
-  if (sem_post(&readers_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_post readers_mutex");
+    sem_post(&access_mutex); // If last reader, allow writer access.
+  sem_post(&readers_mutex);
 
+  printf("Reader %ld reads shared counter value: %d\n", id + 1, local_copy);
   return NULL;
 }
 
+// Writer thread function
 void *writer(void *arg) {
-  if (sem_wait(&order_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_wait order_mutex");
-  if (sem_wait(&access_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_wait access_mutex");
-  if (sem_post(&order_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_post order_mutex");
+  // Writers also wait for their turn to ensure fairness
+  sem_wait(&order_mutex);
+  sem_wait(&access_mutex); // Request exclusive access
+  sem_post(&order_mutex);
 
-  // Simulating writing
+  // Simulate writing by incrementing the shared_counter
   for (int i = 0; i < 25000; ++i) {
     shared_counter++;
   }
   printf("Writer done, final value: %d\n", shared_counter);
 
-  if (sem_post(&access_mutex) != 0)
-    HANDLE_SEM_ERROR(errno, "sem_post access_mutex");
-
+  sem_post(&access_mutex); // Release exclusive access after writing
   return NULL;
 }
 
@@ -117,3 +106,4 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+

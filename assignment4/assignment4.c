@@ -2,101 +2,83 @@
 #include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-#define MAX_READERS 12
-#define NUM_READS 2000000
-#define NUM_WRITES 25000
+sem_t access_mutex;
+sem_t readers_mutex;
+sem_t order_mutex;
+int shared_counter = 0;
+unsigned int readers = 0;
 
-// A semaphore for writer priority
-sem_t writeAccess;
-// Mutex and condition variable for reader control
-pthread_mutex_t readWriteMutex;
-pthread_cond_t canRead;
-int activeReaders = 0;
-int waitingWriters = 0;
-int shared_count = 0;
+void *reader(void *args) {
+  long id = (long)args;
+  sem_wait(&order_mutex);
+  sem_wait(&readers_mutex);
+  if (readers == 0)
+    sem_wait(&access_mutex);
+  readers++;
+  sem_post(&order_mutex);
+  sem_post(&readers_mutex);
 
-void *writer(void *arg) {
-  for (int i = 0; i < NUM_WRITES; i++) {
-    // Wait for exclusive access to write
-    sem_wait(&writeAccess);
-    pthread_mutex_lock(&readWriteMutex);
-    while (activeReaders > 0) {
-      pthread_cond_wait(&canRead, &readWriteMutex);
-    }
-    // Write operation
-    shared_count += 1;
-    pthread_mutex_unlock(&readWriteMutex);
-    sem_post(&writeAccess);
-  }
-  printf("Writer done\n");
+  // Simulate reading the shared_counter 2,000,000 times
+  int local_copy = shared_counter;
+
+  sem_wait(&readers_mutex);
+  readers--;
+  if (readers == 0)
+    sem_post(&access_mutex);
+  sem_post(&readers_mutex);
+
+  printf("Reader %ld read the value: %d\n", id, local_copy);
   return NULL;
 }
 
-void *reader(void *arg) {
-  int id = *((int *)arg);
+void *writer(void *args) {
+  sem_wait(&order_mutex);
+  sem_wait(&access_mutex);
+  sem_post(&order_mutex);
 
-  for (int i = 0; i < NUM_READS; i++) {
-    pthread_mutex_lock(&readWriteMutex);
-    while (waitingWriters > 0) {
-      pthread_cond_wait(&canRead, &readWriteMutex);
-    }
-    activeReaders++;
-    pthread_mutex_unlock(&readWriteMutex);
-
-    // Simulated read operation
-    // No actual reading of shared_count to avoid slowing down
-
-    pthread_mutex_lock(&readWriteMutex);
-    activeReaders--;
-    if (activeReaders == 0 && waitingWriters > 0) {
-      pthread_cond_signal(&canRead);
-    }
-    pthread_mutex_unlock(&readWriteMutex);
+  for (int i = 0; i < 25000; ++i) {
+    shared_counter++;
   }
+  printf("Writer done, final value: %d\n", shared_counter);
 
-  pthread_mutex_lock(&readWriteMutex);
-  printf("I'm reader%d, counter = %d\n", id + 1, shared_count);
-  pthread_mutex_unlock(&readWriteMutex);
-
+  sem_post(&access_mutex);
   return NULL;
 }
 
 int main(int argc, char *argv[]) {
-  pthread_mutex_init(&readWriteMutex, NULL);
-  pthread_cond_init(&canRead, NULL);
-  sem_init(&writeAccess, 0, 1); // Initialize semaphore for writers
-
-  if (argc < 2) {
-    printf("Usage: %s <number of readers>\n", argv[0]);
-    return 1;
+  if (argc != 2) {
+    fprintf(stderr, "Usage: %s <number of readers>\n", argv[0]);
+    return EXIT_FAILURE;
   }
 
   int num_readers = atoi(argv[1]);
-  if (num_readers <= 0 || num_readers > MAX_READERS) {
-    printf("Number of readers must be between 1 and %d.\n", MAX_READERS);
-    return 1;
+  if (num_readers < 1 || num_readers > 12) {
+    fprintf(stderr, "Number of readers must be between 1 and 12.\n");
+    return EXIT_FAILURE;
   }
 
-  pthread_t writers[1], readers[MAX_READERS];
-  int ids[MAX_READERS];
+  sem_init(&access_mutex, 0, 1);
+  sem_init(&readers_mutex, 0, 1);
+  sem_init(&order_mutex, 0, 1);
 
-  pthread_create(&writers[0], NULL, writer, NULL);
+  pthread_t writer_thread;
+  pthread_t reader_threads[num_readers];
 
+  pthread_create(&writer_thread, NULL, writer, NULL);
+  for (long i = 0; i < num_readers; i++) {
+    pthread_create(&reader_threads[i], NULL, reader, (void *)i);
+  }
+
+  pthread_join(writer_thread, NULL);
   for (int i = 0; i < num_readers; i++) {
-    ids[i] = i;
-    pthread_create(&readers[i], NULL, reader, &ids[i]);
+    pthread_join(reader_threads[i], NULL);
   }
 
-  pthread_join(writers[0], NULL);
+  sem_destroy(&access_mutex);
+  sem_destroy(&readers_mutex);
+  sem_destroy(&order_mutex);
 
-  for (int i = 0; i < num_readers; i++) {
-    pthread_join(readers[i], NULL);
-  }
-
-  pthread_mutex_destroy(&readWriteMutex);
-  pthread_cond_destroy(&canRead);
-  sem_destroy(&writeAccess);
-
-  return 0;
+  return EXIT_SUCCESS;
 }

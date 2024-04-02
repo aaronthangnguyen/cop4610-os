@@ -1,10 +1,13 @@
 # ASSIGNMENT 3 REPORT
 
 **Aaron Nguyen**
+
 640347
 
+![Screenshot](./screenshot.png)
+
 ### Task 1
-Done
+Done.
 
 ### Task 2
 1. Section annotations:
